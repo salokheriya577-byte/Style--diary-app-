@@ -2062,7 +2062,8 @@ function StatsView({ data, setData, score, user, onEditOutfit, onToggleItemFav, 
         Wardrobe contains: ${wardrobeSummary}
         Logging history of outfits: ${historySummary}
 
-        Respond ONLY with a JSON object containing:
+        Respond ONLY with a JSON object. Do NOT include any pre-amble, post-amble, or conversational notes. Your response must be 100% valid JSON.
+        Contains:
         1. "archetypes": Array of { "name": string, "score": number } (5 items, scores 0-100).
         2. "palette": Array of 5 hex or color name strings.
         3. "silhouettes": Array of 3 key silhouette descriptions.

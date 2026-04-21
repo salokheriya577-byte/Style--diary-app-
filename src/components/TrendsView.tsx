@@ -64,36 +64,35 @@ export function TrendsView({ data, onSavePreferences, onAddItem }: { data: UserD
         Their Closet: ${data.items.length} pieces in categories: ${favCategories}.
 
         Provide a "Vision of the Tides":
-        1. "The Current Drift": 2-3 detailed fashion trends happening NOW.
-        2. "The Loom's Suggestion": How to style their existing ${data.items.length} items.
-        3. "Marketplace Echoes": Provide exactly 30 unique, high-quality shopping artifacts (tops, bottoms, accessories, shoes) that match the user's aesthetic.
+        1. "The Current Drift": Detailed fashion trends happening NOW.
+        2. "The Loom's Suggestion": How to style their existing items.
+        3. "Marketplace Echoes": Provide exactly 30 unique, high-quality shopping items (tops, bottoms, accessories, shoes) that match the aesthetic.
         
         CRITICAL FOR IMAGES:
-        - Use ONLY high-resolution, professional Unsplash IDs that represent professional fashion photography (model shots, editorial, studio).
+        - Use ONLY high-resolution, professional Unsplash fashion ID URLs.
         - Format: https://images.unsplash.com/photo-[ID]?auto=format&fit=crop&q=80&w=800
-        - DO NOT repeat IDs. Every one of the 30 items MUST have a unique, highly relevant image.
+        - EVERY one of the 30 items MUST have a unique image.
         
         CRITICAL FOR LINKS:
-        - Provide actual direct shopping links to product pages on Zara, H&M, ASOS, Nordstrom, Farfetch, SSENSE, or Net-a-Porter.
+        - Provide actual direct shopping links to product pages (Zara, H&M, ASOS, Farfetch, SSENSE, etc.).
         - Ensure names are distinct and descriptive.
 
         CRITICAL FOR CONCISENESS:
         - Keep "visionHtml" impact-focused and concise (< 300 words) so there is token room for all 30 shopping suggestions.
 
         CRITICAL FOR SCORE:
-        - Every shopping suggestion MUST have a "score" field.
-        - The "score" field MUST be a string formatted as a percentage followed by the '%' sign (e.g., "95%", "98%").
+        - Every suggestion MUST have a "score" field percentage (e.g., "98%").
 
-        Return ONLY a JSON object:
+        Return ONLY a JSON object. No conversational fluff.
         {
           "visionHtml": "...",
           "shoppingSuggestions": [
             {
-              "name": "Exact Product Name",
-              "store": "Retailer Name",
+              "name": "Product Name",
+              "store": "Retailer",
               "price": "₹...",
-              "url": "High-res Unsplash URL",
-              "shopLink": "Direct Shopping Link",
+              "url": "Unsplash URL",
+              "shopLink": "Direct URL",
               "score": "Match %"
             }
           ]

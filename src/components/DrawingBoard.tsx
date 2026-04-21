@@ -18,6 +18,7 @@ export function DrawingBoard({ userItems, onAddItem }: { userItems: any[], onAdd
   const [color, setColor] = useState('#a855f7');
   const [eraserMode, setEraserMode] = useState(false);
   const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [userQuery, setUserQuery] = useState('');
   const [aiResult, setAiResult] = useState<{ 
     match: any, 
     shopping: ShoppingItem[],
@@ -41,41 +42,39 @@ export function DrawingBoard({ userItems, onAddItem }: { userItems: any[], onAdd
       const base64Data = dataUrl.split(',')[1];
       
       const prompt = `
-        Analyze this fashion sketch with extreme precision. 
-        Your goal is to be a master fashion curator identifying the EXACT pieces implied by the drawing.
+        You are the Head Curator of the Alchemy Loom.
+        Analyze this fashion sketch and the following user query: "${userQuery || 'Interpret this aesthetic vision'}"
+        
+        Your goal is to identify the EXACT pieces implied by the drawing and query.
         
         1. Description: Provide a detailed, poetic description of the cut, material, and visual weight.
-        2. Vibe: Identify the specific sub-culture aesthetic (e.g., Avant-garde Minimalist, Neo-Y2K, Quiet Luxury).
+        2. Vibe: Identify the specific sub-culture aesthetic.
         3. Local Match: Find the closest match in: ${JSON.stringify(userItems.map(i => ({ id: i.id, name: i.name, category: i.category }))) }.
-        4. Global Marketplace: Find exactly 30 actual, specific clothing items (tops, bottoms, outwear, shoes) from major shopping sites (Zara, Nordstrom, H&M, Farfetch, SSENSE, ASOS) that perfectly match the visual characteristics and vibe of the sketch. 
+        4. Global Marketplace: Find exactly 30 actual, specific clothing items from Zara, H&M, ASOS, Farfetch, SSENSE, etc. that perfectly match the vision. 
 
         CRITICAL FOR IMAGES:
-        - Use ONLY high-resolution, professional Unsplash fashion ID URLs that match the sketch's aesthetic perfectly.
+        - Use ONLY high-resolution, professional Unsplash fashion ID URLs.
         - Format: https://images.unsplash.com/photo-[ID]?auto=format&fit=crop&q=80&w=800
-        - DO NOT repeat IDs. Every one of the 30 items MUST have a unique, highly relevant image.
+        - EVERY one of the 30 items MUST have a unique image.
         
         CRITICAL FOR LINKS:
         - Provide actual direct shopping links to the specific product pages.
-        - NEVER use placeholder or generic search URLs. Use direct product-like URLs.
-
-        CRITICAL FOR CONCISENESS:
-        - Keep "description" and "vibe" punchy and short so there is room for all 30 shopping suggestions.
+        - Ensure URLs are specific and not just category pages.
 
         CRITICAL FOR SCORE:
-        - Every shopping suggestion MUST have a "score" field.
-        - The "score" field MUST be a string formatted as a percentage followed by the '%' sign (e.g., "95%", "98%").
+        - Every suggestion MUST have a "score" field percentage (e.g., "95%").
 
-        Return ONLY valid JSON:
+        Return ONLY valid JSON.
         {
           "description": "...",
           "vibe": "...",
           "matchedItemId": "...",
           "shoppingSuggestions": [
             { 
-              "store": "Exact Retailer", 
-              "name": "Full Product Name", 
+              "store": "Retailer", 
+              "name": "Product Name", 
               "price": "₹ Price", 
-              "url": "High-res Unsplash Image URL", 
+              "url": "Unsplash URL", 
               "shopLink": "Direct Shopping Link",
               "score": "Match %" 
             }
@@ -145,31 +144,40 @@ export function DrawingBoard({ userItems, onAddItem }: { userItems: any[], onAdd
           {!eraserMode && <div className="absolute top-4 right-4 w-4 h-4 rounded-full shadow-[0_0_10px_rgba(255,255,255,0.5)]" style={{ backgroundColor: color }} />}
         </div>
 
-        <div className="flex items-center justify-between gap-4 px-2">
-            <div className="flex gap-2 p-1.5 bg-black/40 rounded-3xl overflow-x-auto scrollbar-none border border-white/5">
-              {colors.map(c => (
-                <button
-                  key={c}
-                  onClick={() => { setColor(c); setEraserMode(false); }}
-                  className={`w-7 h-7 rounded-full border-2 transition-all ${!eraserMode && color === c ? 'scale-110 border-white shadow-[0_0_10px_white]' : 'border-transparent opacity-60 hover:opacity-100'}`}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
-            </div>
+        <div className="flex flex-col gap-4 mt-6">
+            <input 
+              type="text"
+              value={userQuery}
+              onChange={(e) => setUserQuery(e.target.value)}
+              placeholder="Tell the Oracle what you seek..."
+              className="w-full bg-black/40 border border-white/5 rounded-3xl px-6 py-4 text-sm text-white focus:outline-none focus:ring-2 focus:ring-fuchsia-400 placeholder:text-white/20 font-bold shadow-inner"
+            />
+            <div className="flex items-center justify-between gap-4">
+                <div className="flex gap-2 p-1.5 bg-black/40 rounded-3xl overflow-x-auto scrollbar-none border border-white/5">
+                  {colors.map(c => (
+                    <button
+                      key={c}
+                      onClick={() => { setColor(c); setEraserMode(false); }}
+                      className={`w-7 h-7 rounded-full border-2 transition-all ${!eraserMode && color === c ? 'scale-110 border-white shadow-[0_0_10px_white]' : 'border-transparent opacity-60 hover:opacity-100'}`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
 
-            <div className="flex gap-2">
-                <button 
-                  onClick={() => setEraserMode(!eraserMode)}
-                  className={`p-3.5 rounded-2xl transition-all shadow-lg ${eraserMode ? 'bg-fuchsia-500 text-white shadow-fuchsia-500/20' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}
-                >
-                  <Eraser size={20} />
-                </button>
-                <button 
-                  onClick={handleClear}
-                  className="p-3.5 rounded-2xl bg-white/5 text-white/50 hover:text-rose-400 hover:bg-rose-500/10 transition-all shadow-lg"
-                >
-                  <Trash2 size={20} />
-                </button>
+                <div className="flex gap-2">
+                    <button 
+                      onClick={() => setEraserMode(!eraserMode)}
+                      className={`p-4 rounded-[1.5rem] transition-all shadow-lg ${eraserMode ? 'bg-fuchsia-500 text-white shadow-fuchsia-500/20' : 'bg-white/5 text-white/50 hover:bg-white/10'}`}
+                    >
+                      <Eraser size={20} />
+                    </button>
+                    <button 
+                      onClick={handleClear}
+                      className="p-4 rounded-[1.5rem] bg-white/5 text-white/50 hover:text-rose-400 hover:bg-rose-500/10 transition-all shadow-lg"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                </div>
             </div>
         </div>
 
