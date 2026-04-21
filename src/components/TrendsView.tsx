@@ -3,6 +3,7 @@ import { motion } from 'motion/react';
 import { Compass, Sparkles, Wand2, Plus, X, ExternalLink, ShoppingBag } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
 import { UserData } from '../types';
+import { safeParseJson } from '../lib/json';
 
 const TREND_PREFERENCES = [
   'Aesthetic', 'Pinteresty', 'Halter neck', 'Boat neck',
@@ -11,7 +12,7 @@ const TREND_PREFERENCES = [
   'Boho', 'Chic', 'Edgy'
 ];
 
-export function TrendsView({ data, onSavePreferences }: { data: UserData; onSavePreferences: (prefs: string[]) => void }) {
+export function TrendsView({ data, onSavePreferences, onAddItem }: { data: UserData; onSavePreferences: (prefs: string[]) => void; onAddItem?: (item: any) => void }) {
   const [preferences, setPreferences] = useState<string[]>(data.preferences || []);
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -19,10 +20,16 @@ export function TrendsView({ data, onSavePreferences }: { data: UserData; onSave
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
+    if (data.preferences && data.preferences.length > 0) {
+      setPreferences(data.preferences);
+    }
+  }, [data.preferences]);
+
+  useEffect(() => {
     if (data.preferences && data.preferences.length > 0 && !analysis && !loading && !isEditing) {
       generateTrends(data.preferences);
     }
-  }, [data.preferences]);
+  }, [data.preferences, analysis]);
 
   const togglePref = (pref: string) => {
     setPreferences(prev => 
@@ -57,24 +64,25 @@ export function TrendsView({ data, onSavePreferences }: { data: UserData; onSave
         Their Closet: ${data.items.length} pieces in categories: ${favCategories}.
 
         Provide a "Vision of the Tides":
-        1. "The Current Drift": 1-2 trends happening NOW.
-        2. "The Loom's Suggestion": How to style existing items.
-        3. "Marketplace Echoes": Provide exactly 8 specific, high-quality shopping artifacts that match the user's aesthetic.
+        1. "The Current Drift": 2-3 detailed fashion trends happening NOW.
+        2. "The Loom's Suggestion": How to style their existing ${data.items.length} items.
+        3. "Marketplace Echoes": Provide exactly 30 unique, high-quality shopping artifacts (tops, bottoms, accessories, shoes) that match the user's aesthetic.
         
         CRITICAL FOR IMAGES:
-        - Use ultra-descriptive, professional Unsplash images. 
-        - Format: https://images.unsplash.com/photo-[ID]?auto=format&fit=crop&q=80&w=600
-        - Choose IDs that represent professional, retail-quality fashion photography of the specific item (e.g., editorial shots, model wears).
+        - Use ONLY high-resolution, professional Unsplash IDs that represent professional fashion photography (model shots, editorial, studio).
+        - Format: https://images.unsplash.com/photo-[ID]?auto=format&fit=crop&q=80&w=800
+        - DO NOT repeat IDs. Every one of the 30 items MUST have a unique, highly relevant image.
         
         CRITICAL FOR LINKS:
-        - Provide actual, working direct shopping links to major retailers (Zara, H&M, ASOS, Nordstrom, Farfetch, etc.).
-        - NEVER use placeholder or generic search URLs. Use direct product-like URLs if possible.
-        - Ensure names are distinct and accurate (e.g., "ASOS DESIGN high waist tailored trouser").
+        - Provide actual direct shopping links to product pages on Zara, H&M, ASOS, Nordstrom, Farfetch, SSENSE, or Net-a-Porter.
+        - Ensure names are distinct and descriptive.
+
+        CRITICAL FOR CONCISENESS:
+        - Keep "visionHtml" impact-focused and concise (< 300 words) so there is token room for all 30 shopping suggestions.
 
         CRITICAL FOR SCORE:
         - Every shopping suggestion MUST have a "score" field.
         - The "score" field MUST be a string formatted as a percentage followed by the '%' sign (e.g., "95%", "98%").
-        - This represents the "Aesthetic Match" to their profile.
 
         Return ONLY a JSON object:
         {
@@ -86,7 +94,7 @@ export function TrendsView({ data, onSavePreferences }: { data: UserData; onSave
               "price": "₹...",
               "url": "High-res Unsplash URL",
               "shopLink": "Direct Shopping Link",
-              "score": "Match % (e.g. 98%)"
+              "score": "Match %"
             }
           ]
         }
@@ -96,10 +104,13 @@ export function TrendsView({ data, onSavePreferences }: { data: UserData; onSave
       const response = await ai.models.generateContent({
         model: "gemini-3-flash-preview",
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: { responseMimeType: "application/json" }
+        config: { 
+          responseMimeType: "application/json",
+          maxOutputTokens: 8192
+        }
       });
       
-      const res = JSON.parse(response.text || '{}');
+      const res = safeParseJson(response.text, {} as any);
       setAnalysis(res.visionHtml || '');
       setShoppingSuggestions(res.shoppingSuggestions || []);
     } catch(e) {
@@ -286,6 +297,24 @@ export function TrendsView({ data, onSavePreferences }: { data: UserData; onSave
                       </div>
                     </div>
                     <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent -translate-x-[200%] group-hover:translate-x-[200%] transition-transform duration-1000" />
+                    {onAddItem && (
+                      <button 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onAddItem({
+                            name: item.name,
+                            category: 'Top',
+                            imageUrl: item.url,
+                            weatherTags: ['Sunny']
+                          });
+                        }}
+                        className="absolute top-3 right-3 bg-white/10 hover:bg-white/20 backdrop-blur-md p-2.5 rounded-xl border border-white/20 opacity-0 group-hover:opacity-100 transition-all text-white z-20 shadow-xl"
+                        title="Add to Closet"
+                      >
+                        <Plus size={16} />
+                      </button>
+                    )}
                   </motion.a>
                 ))}
               </div>

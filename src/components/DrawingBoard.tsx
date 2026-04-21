@@ -3,6 +3,7 @@ import { ReactSketchCanvas, ReactSketchCanvasRef } from 'react-sketch-canvas';
 import { motion, AnimatePresence } from 'motion/react';
 import { Palette, Eraser, Trash2, Wand2, Sparkles, X, ShoppingBag, Plus, Search, ExternalLink } from 'lucide-react';
 import { GoogleGenAI } from '@google/genai';
+import { safeParseJson } from '../lib/json';
 
 interface ShoppingItem {
   store: string;
@@ -46,15 +47,19 @@ export function DrawingBoard({ userItems, onAddItem }: { userItems: any[], onAdd
         1. Description: Provide a detailed, poetic description of the cut, material, and visual weight.
         2. Vibe: Identify the specific sub-culture aesthetic (e.g., Avant-garde Minimalist, Neo-Y2K, Quiet Luxury).
         3. Local Match: Find the closest match in: ${JSON.stringify(userItems.map(i => ({ id: i.id, name: i.name, category: i.category }))) }.
-        4. Global Marketplace: Find exactly 8 actual, accurate clothing items from major shopping sites (Amazon, ASOS, Zara, Nordstrom, H&M, Farfetch) that perfectly match the visual characteristics of the sketch. 
+        4. Global Marketplace: Find exactly 30 actual, specific clothing items (tops, bottoms, outwear, shoes) from major shopping sites (Zara, Nordstrom, H&M, Farfetch, SSENSE, ASOS) that perfectly match the visual characteristics and vibe of the sketch. 
 
         CRITICAL FOR IMAGES:
-        - Use high-resolution, professional Unsplash fashion ID URLs that match the sketch's aesthetic perfectly.
-        - Format: https://images.unsplash.com/photo-[ID]?auto=format&fit=crop&q=80&w=600
+        - Use ONLY high-resolution, professional Unsplash fashion ID URLs that match the sketch's aesthetic perfectly.
+        - Format: https://images.unsplash.com/photo-[ID]?auto=format&fit=crop&q=80&w=800
+        - DO NOT repeat IDs. Every one of the 30 items MUST have a unique, highly relevant image.
         
         CRITICAL FOR LINKS:
-        - Provide actual direct shopping links to the specific products identified.
-        - NEVER use placeholder or generic search URLs.
+        - Provide actual direct shopping links to the specific product pages.
+        - NEVER use placeholder or generic search URLs. Use direct product-like URLs.
+
+        CRITICAL FOR CONCISENESS:
+        - Keep "description" and "vibe" punchy and short so there is room for all 30 shopping suggestions.
 
         CRITICAL FOR SCORE:
         - Every shopping suggestion MUST have a "score" field.
@@ -88,10 +93,13 @@ export function DrawingBoard({ userItems, onAddItem }: { userItems: any[], onAdd
             { inlineData: { data: base64Data, mimeType: "image/png" } }
           ]
         },
-        config: { responseMimeType: "application/json" }
+        config: { 
+          responseMimeType: "application/json",
+          maxOutputTokens: 8192
+        }
       });
       
-      const res = JSON.parse(response.text || '{}');
+      const res = safeParseJson(response.text, {} as any);
       let match = userItems.find(i => i.id === res.matchedItemId);
       
       setAiResult({

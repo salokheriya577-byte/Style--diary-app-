@@ -22,6 +22,7 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "isFavorite": { "type": "boolean" },
         "userId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -37,6 +38,7 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "isFavorite": { "type": "boolean" },
         "userId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },

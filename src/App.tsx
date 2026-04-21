@@ -132,6 +132,7 @@ import {
   writeBatch
 } from 'firebase/firestore';
 import { getLocalWeather, WeatherData as LocalWeather } from './lib/weather';
+import { safeParseJson } from './lib/json';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
@@ -160,6 +161,12 @@ export default function App() {
       setUser(u);
       
       if (u) {
+        // Initialize user profile if missing
+        setDoc(doc(db, 'users', u.uid), {
+          email: u.email,
+          createdAt: serverTimestamp()
+        }, { merge: true });
+
         // Hydrate local weather
         getLocalWeather().then(w => setLocalWeather(w)).catch(e => console.warn("Weather error:", e));
 
@@ -195,7 +202,15 @@ export default function App() {
   }, []);
 
   // Hydrate Data... for now keeping local data logic but wrapped in user check
-  const varietyScore = 65; 
+  const varietyScore = useMemo(() => {
+    if (data.logs.length === 0 || data.items.length === 0) return 0;
+    const usedItemIds = new Set<string>();
+    data.logs.forEach(log => {
+      const outfit = data.outfits.find(o => o.id === log.outfitId);
+      if (outfit) outfit.itemIds.forEach(id => usedItemIds.add(id));
+    });
+    return Math.min(100, Math.round((usedItemIds.size / data.items.length) * 100));
+  }, [data.logs, data.outfits, data.items]);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showLogModal, setShowLogModal] = useState(false);
   const [repetitionAlert, setRepetitionAlert] = useState<{ date: string; outfit: string } | null>(null);
@@ -449,7 +464,25 @@ export default function App() {
                   onLogOutfit={handleLogOutfit}
                   onCreateAndLogOutfit={handleCreateAndLogOutfit}
                 />}
-                {activeTab === 'trends' && <TrendsView data={data} onSavePreferences={savePreferences} />}
+                {activeTab === 'trends' && <TrendsView 
+                  data={data} 
+                  onSavePreferences={savePreferences} 
+                  onAddItem={async (item) => {
+                    if (!auth.currentUser) return;
+                    const userPath = `users/${auth.currentUser.uid}`;
+                    const itemId = Math.random().toString(36).substr(2, 9);
+                    try {
+                      await setDoc(doc(db, `${userPath}/items`, itemId), {
+                        ...item,
+                        userId: auth.currentUser.uid,
+                        createdAt: serverTimestamp()
+                      });
+                      // Optional: Switch to wardrobe or show toast
+                    } catch (err) {
+                      console.error("Firestore Error:", err);
+                    }
+                  }}
+                />}
               </AnimatePresence>
             </main>
 
@@ -1092,16 +1125,17 @@ function WardrobeView({ data, setData, onEditOutfit, onToggleItemFav, onToggleOu
 
   const handleAddItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItem.name || !newItem.imageUrl || !auth.currentUser) return;
+    if (!newItem.name || !auth.currentUser) return;
 
     const userPath = `users/${auth.currentUser.uid}`;
     const itemId = editingItem || Math.random().toString(36).substr(2, 9);
     const itemRef = doc(db, `${userPath}/items`, itemId);
 
+    const fallbackImage = 'https://images.unsplash.com/photo-1594932224011-042041c65451?auto=format&fit=crop&q=80&w=400';
     const itemData = {
       name: newItem.name,
       category: newItem.category as Category,
-      imageUrl: newItem.imageUrl,
+      imageUrl: newItem.imageUrl || fallbackImage,
       weatherTags: (newItem.weatherTags as Weather[]) || ['Sunny'],
       userId: auth.currentUser.uid,
     };
@@ -1290,6 +1324,7 @@ function WardrobeView({ data, setData, onEditOutfit, onToggleItemFav, onToggleOu
                       src={data.items.find(i => i.id === id)?.imageUrl} 
                       className="flex-1 object-cover h-full" 
                       referrerPolicy="no-referrer" 
+                      onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1594932224011-042041c65451?auto=format&fit=crop&q=80&w=200'; }}
                     />
                   ))}
                   {outfit.itemIds.length === 0 && <div className="w-full h-full bg-white/5" />}
@@ -1319,7 +1354,7 @@ function WardrobeView({ data, setData, onEditOutfit, onToggleItemFav, onToggleOu
                         >
                           <Heart size={14} fill={outfit.isFavorite ? "currentColor" : "none"} />
                         </button>
-                        <button onClick={() => setData(prev => ({ ...prev, outfits: prev.outfits.filter(o => o.id !== outfit.id) }))} className="p-2 bg-white/5 rounded-xl text-white/40 hover:text-rose-400 hover:bg-rose-500/10 transition-all">
+                        <button onClick={() => onDeleteOutfit(outfit.id)} className="p-2 bg-white/5 rounded-xl text-white/40 hover:text-rose-400 hover:bg-rose-500/10 transition-all">
                           <Trash2 size={14} />
                         </button>
                      </div>
@@ -1520,7 +1555,7 @@ function WardrobeView({ data, setData, onEditOutfit, onToggleItemFav, onToggleOu
                   </div>
                   {newItem.imageUrl && (
                     <div className="mt-2 w-full h-40 rounded-2xl overflow-hidden border-2 border-lavender-500/30 relative bg-black/20">
-                      <img src={newItem.imageUrl} className="w-full h-full object-contain" alt="Preview" />
+                      <img src={newItem.imageUrl} className="w-full h-full object-contain" alt="Preview" referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1594932224011-042041c65451?auto=format&fit=crop&q=80&w=400'; }} />
                       <button type="button" onClick={() => setNewItem(n => ({...n, imageUrl: ''}))} className="absolute top-2 right-2 p-1.5 bg-black/60 backdrop-blur-md text-white rounded-full hover:bg-red-500/80 transition-colors">
                         <X size={14} />
                       </button>
@@ -2040,7 +2075,12 @@ function StatsView({ data, setData, score, user, onEditOutfit, onToggleItemFav, 
         config: { responseMimeType: "application/json" }
       });
       
-      setAnalysis(JSON.parse(response.text || '{}'));
+      setAnalysis(safeParseJson(response.text, {
+        archetypes: [{name: "Unknown", score: 50}],
+        palette: ["#888"],
+        silhouettes: ["Undefined"],
+        summary: "The stars are silent today."
+      }));
     } catch (err) {
       console.error("AI Error:", err);
       // Fallback
@@ -2197,7 +2237,12 @@ function StatsView({ data, setData, score, user, onEditOutfit, onToggleItemFav, 
              data.outfits.slice(0, 6).map(outfit => (
                <div key={outfit.id} className="w-32 shrink-0 aspect-[4/5] bg-black/40 rounded-[2rem] overflow-hidden relative border border-white/5 shadow-2xl group snap-center">
                   {outfit.itemIds[0] ? (
-                    <img src={data.items.find(i => i.id === outfit.itemIds[0])?.imageUrl} className="w-full h-full object-cover mix-blend-luminosity opacity-40 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" referrerPolicy="no-referrer" />
+                    <img 
+                      src={data.items.find(i => i.id === outfit.itemIds[0])?.imageUrl} 
+                      className="w-full h-full object-cover mix-blend-luminosity opacity-40 group-hover:opacity-100 group-hover:scale-110 transition-all duration-700" 
+                      referrerPolicy="no-referrer" 
+                      onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1594932224011-042041c65451?auto=format&fit=crop&q=80&w=200'; }}
+                    />
                   ) : <div className="w-full h-full bg-white/5" />}
                   <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-[#0a0410] via-[#0a0410]/95 to-transparent">
                     <p className="text-[8px] uppercase font-black text-white truncate text-center tracking-widest brightness-150 drop-shadow-md">{outfit.name}</p>
@@ -2239,6 +2284,7 @@ function StatsView({ data, setData, score, user, onEditOutfit, onToggleItemFav, 
                       src={data.items.find(i => i.id === outfit.itemIds[0])?.imageUrl} 
                       className="w-full h-full object-cover" 
                       referrerPolicy="no-referrer"
+                      onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1594932224011-042041c65451?auto=format&fit=crop&q=80&w=200'; }}
                     />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -2299,7 +2345,7 @@ function StatsView({ data, setData, score, user, onEditOutfit, onToggleItemFav, 
             <div className="grid grid-cols-3 gap-3">
               {favoriteItems.map(item => (
                 <div key={item.id} className="relative aspect-[3/4] rounded-2xl overflow-hidden group border border-white/10">
-                  <img src={item.imageUrl} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" />
+                  <img src={item.imageUrl} className="w-full h-full object-cover transition-transform group-hover:scale-110" referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1594932224011-042041c65451?auto=format&fit=crop&q=80&w=200'; }} />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex flex-col justify-end p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <p className="text-[9px] font-bold text-white truncate mb-2">{item.name}</p>
                     <div className="flex gap-1 justify-center">
